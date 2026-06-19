@@ -5,7 +5,8 @@ import UIKit
 
 public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCycleDelegate {
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "flutter_web_auth_2", binaryMessenger: registrar.messenger())
+        let channel = FlutterMethodChannel(
+            name: "flutter_web_auth_2", binaryMessenger: registrar.messenger())
         let instance = FlutterWebAuth2Plugin(registrar: registrar)
         registrar.addMethodCallDelegate(instance, channel: channel)
         registrar.addApplicationDelegate(instance)
@@ -14,6 +15,9 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
 
     private weak var registrar: FlutterPluginRegistrar?
     var completionHandler: ((URL?, Error?) -> Void)?
+    private var callbackURLScheme: String?
+    private var httpsHost: String?
+    private var httpsPath: String?
 
     init(registrar: FlutterPluginRegistrar) {
         self.registrar = registrar
@@ -22,17 +26,24 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         if call.method == "authenticate",
-           let arguments = call.arguments as? [String: AnyObject],
-           let urlString = arguments["url"] as? String,
-           let url = URL(string: urlString),
-           let callbackURLScheme = arguments["callbackUrlScheme"] as? String,
-           let options = arguments["options"] as? [String: AnyObject]
+            let arguments = call.arguments as? [String: AnyObject],
+            let urlString = arguments["url"] as? String,
+            let url = URL(string: urlString),
+            let callbackURLScheme = arguments["callbackUrlScheme"] as? String,
+            let options = arguments["options"] as? [String: AnyObject]
         {
-            var sessionToKeepAlive: Any? // if we do not keep the session alive, it will get closed immediately while showing the dialog
+            self.callbackURLScheme = callbackURLScheme
+            self.httpsHost = options["httpsHost"] as? String
+            self.httpsPath = options["httpsPath"] as? String
+
+            var sessionToKeepAlive: Any?  // if we do not keep the session alive, it will get closed immediately while showing the dialog
             completionHandler = { (url: URL?, err: Error?) in
                 self.completionHandler = nil
+                self.callbackURLScheme = nil
+                self.httpsHost = nil
+                self.httpsPath = nil
 
-                if (sessionToKeepAlive != nil) {
+                if sessionToKeepAlive != nil {
                     if #available(iOS 12, *) {
                         (sessionToKeepAlive as! ASWebAuthenticationSession).cancel()
                     } else if #available(iOS 11, *) {
@@ -49,7 +60,7 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
                                     code: "CANCELED",
                                     message: "User canceled login",
                                     details: Self.errorDetails(from: err)
-                               )
+                                )
                             )
                             return
                         }
@@ -79,7 +90,10 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
                 }
 
                 guard let url = url else {
-                    result(FlutterError(code: "EUNKNOWN", message: "URL was null, but no error provided.", details: nil))
+                    result(
+                        FlutterError(
+                            code: "EUNKNOWN", message: "URL was null, but no error provided.",
+                            details: nil))
                     return
                 }
 
@@ -89,42 +103,54 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
             if #available(iOS 12, *) {
                 var _session: ASWebAuthenticationSession? = nil
                 if #available(iOS 17.4, *) {
-                    if (callbackURLScheme == "https") {
+                    if callbackURLScheme == "https" {
                         guard let host = options["httpsHost"] as? String else {
                             result(FlutterError.invalidHttpsHostError)
-                            return 
+                            return
                         }
 
                         guard let path = options["httpsPath"] as? String else {
                             result(FlutterError.invalidHttpsPathError)
-                            return 
+                            return
                         }
 
-                        _session = ASWebAuthenticationSession(url: url, callback: ASWebAuthenticationSession.Callback.https(host: host, path: path), completionHandler: completionHandler!)
+                        _session = ASWebAuthenticationSession(
+                            url: url,
+                            callback: ASWebAuthenticationSession.Callback.https(
+                                host: host, path: path), completionHandler: completionHandler!)
                     } else {
-                        _session = ASWebAuthenticationSession(url: url, callback: ASWebAuthenticationSession.Callback.customScheme(callbackURLScheme), completionHandler: completionHandler!)
+                        _session = ASWebAuthenticationSession(
+                            url: url,
+                            callback: ASWebAuthenticationSession.Callback.customScheme(
+                                callbackURLScheme), completionHandler: completionHandler!)
                     }
                 } else {
-                    _session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme, completionHandler: completionHandler!)
+                    _session = ASWebAuthenticationSession(
+                        url: url, callbackURLScheme: callbackURLScheme,
+                        completionHandler: completionHandler!)
                 }
                 let session = _session!
 
                 if #available(iOS 13, *) {
                     var rootViewController = acquireRootViewController()
 
-                    if (rootViewController == nil) {
+                    if rootViewController == nil {
                         result(FlutterError.acquireRootViewControllerFailed)
                         return
                     }
 
-                    while let presentedViewController = rootViewController!.presentedViewController {
+                    while let presentedViewController = rootViewController!.presentedViewController
+                    {
                         rootViewController = presentedViewController
                     }
                     if let nav = rootViewController as? UINavigationController {
                         rootViewController = nav.visibleViewController ?? rootViewController
                     }
 
-                    guard let contextProvider = rootViewController as? ASWebAuthenticationPresentationContextProviding else {
+                    guard
+                        let contextProvider = rootViewController
+                            as? ASWebAuthenticationPresentationContextProviding
+                    else {
                         result(FlutterError.acquireRootViewControllerFailed)
                         return
                     }
@@ -137,11 +163,17 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
                 session.start()
                 sessionToKeepAlive = session
             } else if #available(iOS 11, *) {
-                let session = SFAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme, completionHandler: completionHandler!)
+                let session = SFAuthenticationSession(
+                    url: url, callbackURLScheme: callbackURLScheme,
+                    completionHandler: completionHandler!)
                 session.start()
                 sessionToKeepAlive = session
             } else {
-                result(FlutterError(code: "FAILED", message: "This plugin does currently not support iOS lower than iOS 11", details: nil))
+                result(
+                    FlutterError(
+                        code: "FAILED",
+                        message: "This plugin does currently not support iOS lower than iOS 11",
+                        details: nil))
             }
         } else if call.method == "clearAllDanglingCalls" {
             // we do not keep track of old callbacks on iOS, so nothing to do here
@@ -154,8 +186,8 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
     public func application(
         _ application: UIApplication,
         continue userActivity: NSUserActivity,
-        restorationHandler: @escaping ([Any]) -> Void) -> Bool
-    {
+        restorationHandler: @escaping ([Any]) -> Void
+    ) -> Bool {
         return handleUserActivity(userActivity)
     }
 
@@ -167,10 +199,30 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
     @discardableResult
     private func handleUserActivity(_ userActivity: NSUserActivity) -> Bool {
         guard userActivity.activityType == NSUserActivityTypeBrowsingWeb,
-              let url = userActivity.webpageURL,
-              let completionHandler = completionHandler else {
+            let url = userActivity.webpageURL,
+            let completionHandler = completionHandler,
+            let scheme = callbackURLScheme
+        else {
             return false
         }
+
+        guard url.scheme?.lowercased() == scheme.lowercased() else {
+            return false
+        }
+
+        if scheme.lowercased() == "https" {
+            guard let expectedHost = httpsHost,
+                url.host?.lowercased() == expectedHost.lowercased()
+            else {
+                return false
+            }
+            if let expectedPath = httpsPath {
+                guard url.path.hasPrefix(expectedPath) else {
+                    return false
+                }
+            }
+        }
+
         completionHandler(url, nil)
         return true
     }
@@ -190,7 +242,8 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
             keyWindow = windowScene.keyWindow
         }
         if keyWindow == nil {
-            keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first
+            keyWindow =
+                windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first
         }
         return keyWindow?.rootViewController
     }
@@ -200,39 +253,44 @@ public class FlutterWebAuth2Plugin: NSObject, FlutterPlugin, FlutterSceneLifeCyc
         return [
             "domain": nsError.domain,
             "code": nsError.code,
-            "description": nsError.localizedDescription
+            "description": nsError.localizedDescription,
         ]
     }
 }
 
 @available(iOS 13, *)
 extension FlutterViewController: ASWebAuthenticationPresentationContextProviding {
-    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor
+    {
         return view.window!
     }
 }
 
-fileprivate extension FlutterError {
-    static var acquireRootViewControllerFailed: FlutterError {
-        return FlutterError(code: "ACQUIRE_ROOT_VIEW_CONTROLLER_FAILED", message: "Failed to acquire root view controller", details: nil)
+extension FlutterError {
+    fileprivate static var acquireRootViewControllerFailed: FlutterError {
+        return FlutterError(
+            code: "ACQUIRE_ROOT_VIEW_CONTROLLER_FAILED",
+            message: "Failed to acquire root view controller", details: nil)
     }
 
-    static var invalidHttpsHostError: FlutterError {
+    fileprivate static var invalidHttpsHostError: FlutterError {
         return FlutterError(
             code: "INVALID_HTTPS_HOST_ERROR",
             message: "Failed to retrieve host for https scheme",
             details: [
-                "description": "When callbackUrlScheme is https, options.httpsHost must be provided."
+                "description":
+                    "When callbackUrlScheme is https, options.httpsHost must be provided."
             ]
         )
     }
 
-    static var invalidHttpsPathError: FlutterError {
+    fileprivate static var invalidHttpsPathError: FlutterError {
         return FlutterError(
             code: "INVALID_HTTPS_PATH_ERROR",
             message: "Failed to retrieve path for https scheme",
             details: [
-                "description": "When callbackUrlScheme is https, options.httpsPath must be provided."
+                "description":
+                    "When callbackUrlScheme is https, options.httpsPath must be provided."
             ]
         )
     }
