@@ -1,3 +1,7 @@
+## 6.0.0-alpha.8
+
+- 💥 Migrate to `material_ui` package
+
 ## 6.0.0-alpha.7
 
 - 🐛 Handle missing `authUri`/`callbackScheme` gracefully (Thanks to [@md-shohan-ahmed](https://github.com/md-shohan-ahmed) in [#209](https://github.com/ThexXTURBOXx/flutter_web_auth_2/pull/209), related to [#207](https://github.com/ThexXTURBOXx/flutter_web_auth_2/issues/207))
