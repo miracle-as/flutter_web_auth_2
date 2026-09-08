@@ -3,9 +3,9 @@ import 'dart:io' show HttpServer;
 
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:material_ui/material_ui.dart';
 
 const _html = '''
 <!DOCTYPE html>
