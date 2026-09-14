@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_auth_2/src/options.dart';
 import 'package:flutter_web_auth_2/src/platform/platform_is.dart';
 import 'package:flutter_web_auth_2_platform_interface/flutter_web_auth_2_platform_interface.dart';
+import 'package:material_ui/material_ui.dart';
 
 export 'src/options.dart';
 export 'src/unsupported.dart'
